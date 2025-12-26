@@ -1,0 +1,28 @@
+[project]
+name = "agentcore-policy-tutorials"
+version = "0.1.0"
+description = "Amazon Bedrock AgentCore Policy Tutorials"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    # Core AWS SDK
+    "boto3>=1.42.0",
+    "botocore>=1.34.0",
+
+    # AgentCore Toolkit
+    "bedrock-agentcore-starter-toolkit>=0.2.4",
+
+    # HTTP requests (for OAuth token)
+    "requests>=2.31.0",
+
+    # MCP Server
+    "mcp>=1.0.0",
+    "uvicorn>=0.30.0",
+
+    # Jupyter notebook support
+    "jupyter>=1.0.0",
+    "jupyterlab>=4.0.0",
+    "ipykernel>=6.25.0",
+    "notebook>=7.0.0",
+    "ipython>=8.0.0",
+]
