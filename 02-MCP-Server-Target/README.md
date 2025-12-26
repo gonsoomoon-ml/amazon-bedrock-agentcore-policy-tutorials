@@ -1,103 +1,91 @@
-# AgentCore Policy with MCP Server Target
+# MCP 서버 타겟을 사용한 AgentCore Policy
 
-## Overview
+## 개요
 
-This tutorial demonstrates how to use **Amazon Bedrock AgentCore Policy** with an **MCP Server Target** instead of a Lambda Target.
+이 튜토리얼은 Lambda 타겟 대신 **MCP 서버 타겟**과 함께 **Amazon Bedrock AgentCore Policy**를 사용하는 방법을 설명합니다.
 
-### Architecture
+### 아키텍처
 
 ```
 ┌─────────────┐     ┌─────────────────────┐     ┌─────────────────┐
-│   Agent     │────>│  AgentCore Gateway  │────>│  MCP Server     │
-│  (Client)   │ JWT │  + Cedar Policy     │ MCP │  (FastMCP)      │
+│   에이전트   │────>│  AgentCore Gateway  │────>│  MCP 서버       │
+│  (클라이언트) │ JWT │  + Cedar Policy     │ MCP │  (FastMCP)      │
 └─────────────┘     └─────────────────────┘     └─────────────────┘
 ```
 
-### Lambda Target vs MCP Server Target
+### Lambda 타겟 vs MCP 서버 타겟
 
-| Aspect | Lambda Target | MCP Server Target |
-|--------|---------------|-------------------|
-| Backend | AWS Lambda Function | MCP Server (HTTP) |
-| Protocol | Lambda Invoke | MCP over HTTP |
-| Tool Discovery | Inline Schema | SynchronizeGatewayTargets API |
-| Hosting | AWS Managed | Self-hosted / AgentCore Runtime |
+| 항목 | Lambda 타겟 | MCP 서버 타겟 |
+|------|-------------|---------------|
+| 백엔드 | AWS Lambda 함수 | MCP 서버 (HTTP) |
+| 프로토콜 | Lambda Invoke | MCP over HTTP |
+| 도구 탐색 | 인라인 스키마 | SynchronizeGatewayTargets API |
+| 호스팅 | AWS 관리형 | 자체 호스팅 / AgentCore Runtime |
 
-## Prerequisites
+## 사전 요구사항
 
-- AWS Account with appropriate IAM permissions
-- Existing AgentCore Gateway with OAuth Authorizer
+- 적절한 IAM 권한이 있는 AWS 계정
+- OAuth Authorizer가 설정된 AgentCore Gateway
 - Python 3.10+
-- bedrock-agentcore-starter-toolkit (for Runtime deployment)
+- bedrock-agentcore-starter-toolkit (Runtime 배포용)
 
-## Folder Structure
+## 폴더 구조
 
 ```
-05-Fine-Grained-Access-Control-MCP/
-├── README.md                 # This file
-├── tutorial.ipynb            # Main tutorial notebook
-├── mcp_server.py             # FastMCP server with refund tool
-├── deploy_mcp_runtime.py     # Deploy to AgentCore Runtime
-├── test_mcp_target.py        # Step-by-step test script
-├── requirements.txt          # Python dependencies
-└── scripts/                  # Utility modules
-    ├── __init__.py
-    ├── auth_utils.py         # Token handling
-    ├── gateway_utils.py      # Gateway + MCP target functions
-    └── policy_utils.py       # Policy Engine + Cedar policies
+02-MCP-Server-Target/
+├── README.md                      # 이 파일
+├── 01-Setup-MCP-Runtime-Gateway.ipynb  # Gateway 및 MCP Runtime 설정
+├── 02-Policy-Enforcement.ipynb    # 정책 적용 테스트
+├── mcp_server.py                  # FastMCP 서버 (환불 도구 포함)
+├── deploy_mcp_runtime.py          # AgentCore Runtime 배포 스크립트
+├── Dockerfile                     # 컨테이너 설정
+├── requirements_runtime.txt       # MCP 서버 의존성
+└── img/                           # 스크린샷
 ```
 
-## Quick Start
+## 빠른 시작
 
-### Option A: Deploy to AgentCore Runtime (Recommended)
+### 옵션 A: AgentCore Runtime에 배포 (권장)
 
-This deploys the MCP server to AWS AgentCore Runtime, providing a public URL automatically.
+MCP 서버를 AWS AgentCore Runtime에 배포하면 퍼블릭 URL이 자동으로 제공됩니다.
 
 ```bash
-# Step 1: Deploy MCP server to Runtime
-python test_mcp_target.py --step 1r
+# 1단계: 환경 설정 (00_setup 폴더에서)
+cd ../00_setup
+./create_uv_virtual_env.sh AgentCorePolicy
 
-# Step 2: Test MCP server
-python test_mcp_target.py --step 2
+# 2단계: Jupyter Lab 실행
+uv run jupyter lab
 
-# Step 3-5: Create target, policy, and test
-python test_mcp_target.py --step 3
-python test_mcp_target.py --step 4
-python test_mcp_target.py --step 5
-
-# Or run all steps automatically
-python test_mcp_target.py --all --use-runtime
+# 3단계: 01-Setup-MCP-Runtime-Gateway.ipynb 노트북 실행
+# 4단계: 02-Policy-Enforcement.ipynb 노트북 실행
 ```
 
-### Option B: Local Server with ngrok
+### 옵션 B: ngrok을 사용한 로컬 서버
 
 ```bash
-# Terminal 1: Run MCP server
+# 터미널 1: MCP 서버 실행
 python mcp_server.py
 
-# Terminal 2: Expose via ngrok (for Gateway access)
+# 터미널 2: ngrok으로 외부 노출 (Gateway 접근용)
 ngrok http 8000
 
-# Use the ngrok URL when prompted in step 3
-python test_mcp_target.py --step 3 --mcp-url https://abc.ngrok.io/mcp
+# ngrok URL을 Gateway 타겟 생성 시 사용
 ```
 
-### Run Tutorial Notebook
+## MCP 서버 도구
 
-Open `tutorial.ipynb` in Jupyter and follow the steps.
+포함된 MCP 서버 (`mcp_server.py`)가 제공하는 도구:
 
-## MCP Server Tools
+| 도구 | 설명 | 파라미터 |
+|------|------|----------|
+| `refund` | 환불 처리 | `amount`, `order_id`, `reason` |
+| `get_order` | 주문 상세 조회 | `order_id` |
+| `approve_claim` | 보험 청구 승인 | `claim_id`, `amount`, `risk_level` |
 
-The included MCP server (`mcp_server.py`) provides these tools:
+## 주요 API
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `refund` | Process a refund | `amount`, `order_id`, `reason` |
-| `get_order` | Get order details | `order_id` |
-| `approve_claim` | Approve insurance claim | `claim_id`, `amount`, `risk_level` |
-
-## Key APIs
-
-### Create MCP Server Target
+### MCP 서버 타겟 생성
 
 ```python
 target_config = {
@@ -116,7 +104,7 @@ response = gateway_client.create_gateway_target(
 )
 ```
 
-### Synchronize Gateway Targets
+### Gateway 타겟 동기화
 
 ```python
 gateway_client.synchronize_gateway_targets(
@@ -125,9 +113,9 @@ gateway_client.synchronize_gateway_targets(
 )
 ```
 
-## Cedar Policy Examples
+## Cedar 정책 예제
 
-### Amount-based Control
+### 금액 기반 제어
 
 ```cedar
 permit(principal,
@@ -138,7 +126,7 @@ when {
 };
 ```
 
-### Risk-level Control
+### 위험 등급 기반 제어
 
 ```cedar
 permit(principal,
@@ -149,29 +137,29 @@ when {
 };
 ```
 
-## Troubleshooting
+## 문제 해결
 
-### Gateway cannot reach MCP Server
+### Gateway가 MCP 서버에 연결할 수 없음
 
-- Ensure MCP server has a public URL (use ngrok or deploy to EC2)
-- Check security groups allow inbound traffic on port 8000
-- Verify URL is correctly URL-encoded
+- MCP 서버에 퍼블릭 URL이 있는지 확인 (ngrok 사용 또는 EC2에 배포)
+- 보안 그룹에서 8000 포트 인바운드 트래픽 허용 확인
+- URL이 올바르게 URL 인코딩되었는지 확인
 
-### Tool Synchronization Failed
+### 도구 동기화 실패
 
-- Check MCP server is running and accessible
-- Verify MCP protocol version is supported (2025-06-18 or 2025-03-26)
-- Use `GetGatewayTarget` API to check synchronization status
+- MCP 서버가 실행 중이고 접근 가능한지 확인
+- MCP 프로토콜 버전이 지원되는지 확인 (2025-06-18 또는 2025-03-26)
+- `GetGatewayTarget` API로 동기화 상태 확인
 
-### Policy Not Enforced
+### 정책이 적용되지 않음
 
-- Verify Policy Engine is attached to Gateway in ENFORCE mode
-- Check policy is in ACTIVE state
-- Confirm tool name matches: `{TargetName}___{tool_name}`
+- Policy Engine이 ENFORCE 모드로 Gateway에 연결되었는지 확인
+- 정책이 ACTIVE 상태인지 확인
+- 도구 이름이 일치하는지 확인: `{TargetName}___{tool_name}`
 
-## References
+## 참고 자료
 
-- [AWS Docs: MCP Server Targets](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-target-MCPservers.html)
-- [MCP Protocol Specification](https://modelcontextprotocol.io/)
-- [FastMCP Documentation](https://github.com/modelcontextprotocol/servers)
-- [Cedar Policy Language](https://www.cedarpolicy.com/)
+- [AWS 문서: MCP 서버 타겟](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-target-MCPservers.html)
+- [MCP 프로토콜 사양](https://modelcontextprotocol.io/)
+- [FastMCP 문서](https://github.com/modelcontextprotocol/servers)
+- [Cedar Policy 언어](https://www.cedarpolicy.com/)

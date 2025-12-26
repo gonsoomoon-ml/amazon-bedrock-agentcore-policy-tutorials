@@ -1,4 +1,4 @@
-# Amazon Bedrock AgentCore Policy - 세분화된 접근 제어 튜토리얼
+# Lambda 타겟을 사용한 AgentCore Policy
 
 ## 개요
 
@@ -36,25 +36,13 @@
 ## 폴더 구조
 
 ```
-04-Fine-Grained-Access-Control-kr/
-├── README.md                 # 이 파일
-├── tutorial.ipynb            # 메인 튜토리얼 노트북
-├── setup-gateway.py          # Gateway/Cognito 설정 스크립트
-├── gateway_config.json       # Gateway/Cognito 설정 (자동 생성)
-│
-├── scripts/                  # 유틸리티 모듈
-│   ├── __init__.py
-│   ├── auth_utils.py         # 토큰 발급/디코딩
-│   ├── gateway_utils.py      # Gateway 설정/관리
-│   ├── policy_utils.py       # Policy Engine/Cedar 정책
-│   └── cognito_utils.py      # Cognito Lambda Trigger
-│
-└── docs/                     # 상세 문서
-    ├── README.md             # 문서 개요
-    ├── cognito.md            # Amazon Cognito 가이드
-    ├── cedar-policy.md       # Cedar 정책 문법
-    ├── jwt-authorizer.md     # JWT Authorizer 설명
-    └── troubleshooting.md    # 문제 해결 가이드
+01-Lambda-Target/
+├── README.md                      # 이 파일
+├── 01-Setup-Gateway-Lambda.ipynb  # Gateway 및 Lambda 설정
+├── 02-Policy-Enforcement.ipynb    # 정책 적용 테스트
+├── setup-gateway.py               # Gateway/Cognito 설정 스크립트
+├── gateway_config.json            # Gateway/Cognito 설정 (자동 생성)
+└── img/                           # 스크린샷
 ```
 
 ## 사전 요구사항
@@ -107,18 +95,18 @@ python setup-gateway.py --region us-east-1
 cd ../00_setup
 uv run jupyter lab
 
-# 또는 직접 실행
-jupyter lab ../04-Fine-Grained-Access-Control-kr/tutorial.ipynb
+# 1단계: 01-Setup-Gateway-Lambda.ipynb 노트북 실행
+# 2단계: 02-Policy-Enforcement.ipynb 노트북 실행
 ```
 
 ### 4. 문서 참고
 
-상세한 개념 설명은 `docs/` 폴더를 참고하세요:
+상세한 개념 설명은 `../docs/` 폴더를 참고하세요:
 
-- [Amazon Cognito](docs/cognito.md)
-- [Cedar Policy 문법](docs/cedar-policy.md)
-- [JWT Authorizer](docs/jwt-authorizer.md)
-- [문제 해결](docs/troubleshooting.md)
+- [Amazon Cognito](../docs/cognito.md)
+- [Cedar Policy 문법](../docs/cedar-policy.md)
+- [JWT Authorizer](../docs/jwt-authorizer.md)
+- [문제 해결](../docs/troubleshooting.md)
 
 ## 학습 내용
 
@@ -148,7 +136,7 @@ jupyter lab ../04-Fine-Grained-Access-Control-kr/tutorial.ipynb
 
 ## 관련 자료
 
-- [원본 영문 튜토리얼](../03-Fine-Grained-Access-Control/)
+- [MCP 서버 타겟 튜토리얼](../02-MCP-Server-Target/)
 - [Cedar 공식 사이트](https://www.cedarpolicy.com/)
 - [Amazon Verified Permissions](https://aws.amazon.com/verified-permissions/)
 - [Amazon Cognito 개발자 가이드](https://docs.aws.amazon.com/cognito/latest/developerguide/)

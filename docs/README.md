@@ -54,8 +54,10 @@ JWT 토큰의 클레임이 Cedar에서 접근되는 방식입니다. `principal.
 
 ## 빠른 시작
 
-1. **환경 설정**: `../03-Fine-Grained-Access-Control/setup-gateway.py` 실행
-2. **튜토리얼 실행**: `tutorial.ipynb` 노트북 실행
+1. **환경 설정**: `../00_setup/create_uv_virtual_env.sh` 실행
+2. **튜토리얼 선택**:
+   - Lambda 타겟: `../01-Lambda-Target/` 폴더의 노트북 실행
+   - MCP 서버 타겟: `../02-MCP-Server-Target/` 폴더의 노트북 실행
 3. **문서 참고**: 필요한 개념은 이 docs 폴더의 문서 참조
 
 ## 관련 링크
