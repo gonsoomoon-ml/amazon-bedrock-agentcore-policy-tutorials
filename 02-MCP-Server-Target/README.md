@@ -1,87 +1,148 @@
 # MCP 서버 타겟을 사용한 AgentCore Policy
 
-## 개요
+## 왜 MCP 서버 타겟인가?
 
-이 튜토리얼은 Lambda 타겟 대신 **MCP 서버 타겟**과 함께 **Amazon Bedrock AgentCore Policy**를 사용하는 방법을 설명합니다.
+MCP(Model Context Protocol)는 AI 에이전트가 도구를 호출하는 **업계 표준 프로토콜**입니다:
 
-### 아키텍처
+| 장점 | 설명 |
+|------|------|
+| 표준 프로토콜 | MCP over HTTP로 다양한 AI 프레임워크와 호환 |
+| AgentCore Runtime | AWS 관리형 컨테이너에서 MCP 서버 호스팅 |
+| 도구 자동 탐색 | Gateway가 MCP 서버의 도구를 자동으로 동기화 |
 
-```
-┌─────────────┐     ┌─────────────────────┐     ┌─────────────────┐
-│   에이전트   │────>│  AgentCore Gateway  │────>│  MCP 서버       │
-│  (클라이언트) │ JWT │  + Cedar Policy     │ MCP │  (FastMCP)      │
-└─────────────┘     └─────────────────────┘     └─────────────────┘
-```
+> **참고**: Lambda 타겟 튜토리얼을 먼저 완료한 후 진행하세요.
 
-### Lambda 타겟 vs MCP 서버 타겟
+---
+
+## Lambda 타겟과의 차이
 
 | 항목 | Lambda 타겟 | MCP 서버 타겟 |
 |------|-------------|---------------|
-| 백엔드 | AWS Lambda 함수 | MCP 서버 (HTTP) |
+| 백엔드 | AWS Lambda 함수 | AgentCore Runtime 컨테이너 |
 | 프로토콜 | Lambda Invoke | MCP over HTTP |
-| 도구 탐색 | 인라인 스키마 | SynchronizeGatewayTargets API |
-| 호스팅 | AWS 관리형 | 자체 호스팅 / AgentCore Runtime |
+| 인증 | IAM Role (자동) | OAuth2 Credential Provider |
+| Cognito 개수 | 1개 (Gateway용) | 2개 (Gateway + Runtime) |
+| 숫자 비교 | ✅ `amount <= 1000` | ⚠️ float 타입으로 제한적 |
 
-## 사전 요구사항
+---
 
-- 적절한 IAM 권한이 있는 AWS 계정
-- OAuth Authorizer가 설정된 AgentCore Gateway
-- Python 3.10+
-- bedrock-agentcore-starter-toolkit (Runtime 배포용)
+## 학습 결과
+
+이 튜토리얼을 완료하면:
+
+```
+✓ 통과: Finance department should be allowed
+   예상: ALLOWED, 실제: ALLOWED
+
+✓ 통과: Engineering department should be denied
+   예상: DENIED, 실제: DENIED
+
+✓ 통과: Low risk level should be allowed
+   예상: ALLOWED, 실제: ALLOWED
+```
+
+---
+
+## 아키텍처
+
+```
+┌─────────────┐     ┌─────────────────────┐     ┌─────────────────┐
+│  클라이언트  │────>│  AgentCore Gateway  │────>│  AgentCore      │
+│             │ JWT │  + JWT Authorizer   │ MCP │  Runtime        │
+│             │     │  + Policy Engine    │     │  (MCP 서버)     │
+└─────────────┘     └─────────────────────┘     └─────────────────┘
+                              │                          │
+                    ┌─────────┴─────────┐      ┌─────────┴─────────┐
+                    │  Gateway Cognito  │      │  Runtime Cognito  │
+                    │  (Inbound Auth)   │      │  (Outbound Auth)  │
+                    └───────────────────┘      └───────────────────┘
+```
+
+**두 개의 Cognito가 필요한 이유:**
+- **Gateway Cognito**: 클라이언트 → Gateway 인증 (JWT Authorizer)
+- **Runtime Cognito**: Gateway → MCP Runtime 인증 (OAuth2 Credential Provider)
+
+---
+
+## 테스트 시나리오
+
+| 시나리오 | Cedar 정책 | 테스트 |
+|----------|-----------|--------|
+| 부서 기반 | `principal.getTag("department_name") == "finance"` | finance ✅ / engineering ❌ |
+| 그룹 기반 | `principal.getTag("groups") like "*admins*"` | admins ✅ / developers ❌ |
+| 위험 등급 | `context.input.risk_level like "*low*"` | low ✅ / critical ❌ |
+
+> **참고**: MCP 타겟에서는 `amount <= 1000` 같은 숫자 비교가 float 타입으로 인해 제한적입니다. 문자열 비교(`like`)를 권장합니다.
+
+---
 
 ## 폴더 구조
 
 ```
 02-MCP-Server-Target/
 ├── README.md                      # 이 파일
-├── 01-Setup-MCP-Runtime-Gateway.ipynb  # Gateway 및 MCP Runtime 설정
-├── 02-Policy-Enforcement.ipynb    # 정책 적용 테스트
-├── mcp_server.py                  # FastMCP 서버 (환불 도구 포함)
-├── setup_cognito_and_deploy_mcp_server_runtime.py  # Cognito 설정 및 Runtime 배포
+├── 01-Setup-MCP-Runtime-Gateway.ipynb  # Step 1: Runtime, Gateway 설정
+├── 02-Policy-Enforcement.ipynb    # Step 2: Cedar 정책 테스트
+├── mcp_server.py                  # FastMCP 서버 코드
+├── setup_cognito_and_deploy_mcp_server_runtime.py  # 설정 스크립트
 ├── Dockerfile                     # 컨테이너 설정
 ├── requirements_runtime.txt       # MCP 서버 의존성
+├── .bedrock_agentcore.yaml        # Runtime 배포 설정
 └── img/                           # 스크린샷
 ```
 
-## 빠른 시작
+---
 
-### 옵션 A: AgentCore Runtime에 배포 (권장)
+## 시작하기
 
-MCP 서버를 AWS AgentCore Runtime에 배포하면 퍼블릭 URL이 자동으로 제공됩니다.
+### 1. 환경 설정
 
 ```bash
-# 1단계: 환경 설정 (00_setup 폴더에서)
 cd ../00_setup
+chmod +x create_uv_virtual_env.sh
 ./create_uv_virtual_env.sh AgentCorePolicy
 ```
 
+### 2. 노트북 실행
+
 VS Code에서:
 1. `01-Setup-MCP-Runtime-Gateway.ipynb` 열기
-2. 우상단 'Select Kernel' → `AgentCorePolicy` 선택
-3. 셀 순서대로 실행
+2. 우상단 **Select Kernel** → `AgentCorePolicy` 선택
+3. 셀 순서대로 실행 (Runtime 배포에 5-10분 소요)
 4. 완료 후 `02-Policy-Enforcement.ipynb` 실행
 
-### 옵션 B: ngrok을 사용한 로컬 서버
-
-```bash
-# 터미널 1: MCP 서버 실행
-python mcp_server.py
-
-# 터미널 2: ngrok으로 외부 노출 (Gateway 접근용)
-ngrok http 8000
-
-# ngrok URL을 Gateway 타겟 생성 시 사용
-```
+---
 
 ## MCP 서버 도구
 
-포함된 MCP 서버 (`mcp_server.py`)가 제공하는 도구:
+`mcp_server.py`에서 제공하는 도구:
 
 | 도구 | 설명 | 파라미터 |
 |------|------|----------|
 | `refund` | 환불 처리 | `amount`, `order_id`, `reason` |
-| `get_order` | 주문 상세 조회 | `order_id` |
+| `get_order` | 주문 조회 | `order_id` |
 | `approve_claim` | 보험 청구 승인 | `claim_id`, `amount`, `risk_level` |
+
+---
+
+## Cedar 정책 핵심 패턴
+
+```cedar
+// 부서 기반 접근 제어
+permit(principal, action, resource)
+when {
+    principal.hasTag("department_name") &&
+    principal.getTag("department_name") == "finance"
+};
+
+// 위험 등급 기반 제어 (문자열 비교)
+permit(principal, action, resource)
+when {
+    context.input.risk_level like "*low*"
+};
+```
+
+---
 
 ## 주요 API
 
@@ -91,75 +152,60 @@ ngrok http 8000
 target_config = {
     "mcp": {
         "mcpServer": {
-            "url": "https://your-mcp-server.com/mcp"
+            "url": "https://your-runtime-url/mcp"
         }
     }
 }
 
 response = gateway_client.create_gateway_target(
     gatewayIdentifier=gateway_id,
-    name="MyMCPTarget",
+    name="RefundMCPServerTarget",
     targetConfiguration=target_config,
-    credentialProviderConfigurations=[{"credentialProviderType": "NONE"}]
+    credentialProviderConfigurations=[{
+        "credentialProviderType": "OAUTH",
+        "credentialProvider": {
+            "oauthCredentialProvider": {
+                "providerArn": credential_provider_arn,
+                "scopes": ["mcp-server/invoke"]
+            }
+        }
+    }]
 )
 ```
 
 ### Gateway 타겟 동기화
 
 ```python
+# MCP 서버의 도구를 Gateway에 동기화
 gateway_client.synchronize_gateway_targets(
     gatewayIdentifier=gateway_id,
     targetId=target_id
 )
 ```
 
-## Cedar 정책 예제
+---
 
-### 금액 기반 제어
+## 사전 요구사항
 
-```cedar
-permit(principal,
-    action == AgentCore::Action::"RefundMCPServerTarget___refund",
-    resource == AgentCore::Gateway::"arn:aws:...")
-when {
-    context.input.amount <= 1000
-};
-```
+- AWS 계정 및 적절한 IAM 권한
+- Python 3.10+
+- Amazon Cognito **Essentials** 또는 **Plus** 티어
+- bedrock-agentcore-starter-toolkit (Runtime 배포용)
 
-### 위험 등급 기반 제어
-
-```cedar
-permit(principal,
-    action == AgentCore::Action::"RefundMCPServerTarget___approve_claim",
-    resource == AgentCore::Gateway::"arn:aws:...")
-when {
-    context.input.risk_level != "critical"
-};
-```
+---
 
 ## 문제 해결
 
-### Gateway가 MCP 서버에 연결할 수 없음
+| 문제 | 해결 방법 |
+|------|----------|
+| Gateway가 MCP 서버에 연결 실패 | Runtime URL 확인, 보안 그룹 설정 |
+| 도구 동기화 실패 | MCP 서버 실행 중인지 확인, `GetGatewayTarget`으로 상태 확인 |
+| 정책 미적용 | Policy Engine이 ENFORCE 모드인지, 정책이 ACTIVE인지 확인 |
 
-- MCP 서버에 퍼블릭 URL이 있는지 확인 (ngrok 사용 또는 EC2에 배포)
-- 보안 그룹에서 8000 포트 인바운드 트래픽 허용 확인
-- URL이 올바르게 URL 인코딩되었는지 확인
+---
 
-### 도구 동기화 실패
+## 관련 자료
 
-- MCP 서버가 실행 중이고 접근 가능한지 확인
-- MCP 프로토콜 버전이 지원되는지 확인 (2025-06-18 또는 2025-03-26)
-- `GetGatewayTarget` API로 동기화 상태 확인
-
-### 정책이 적용되지 않음
-
-- Policy Engine이 ENFORCE 모드로 Gateway에 연결되었는지 확인
-- 정책이 ACTIVE 상태인지 확인
-- 도구 이름이 일치하는지 확인: `{TargetName}___{tool_name}`
-
-## 참고 자료
-
-- [AWS 문서: MCP 서버 타겟](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-target-MCPservers.html)
-- [MCP 프로토콜 사양](https://modelcontextprotocol.io/)
-- [FastMCP 문서](https://github.com/modelcontextprotocol/servers)
-- [Cedar Policy 언어](https://www.cedarpolicy.com/)
+- [Lambda 타겟 튜토리얼](../01-Lambda-Target/) - 먼저 시작하기
+- [AgentCore Identity 가이드](../docs/agentcore-identity.md) - Outbound Auth 상세
+- [Cedar Policy 문법](../docs/cedar-policy.md)

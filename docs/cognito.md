@@ -1,69 +1,76 @@
 # Amazon Cognito 가이드
 
-## Amazon Cognito란?
+## 1. Amazon Cognito란?
 
 **Amazon Cognito**는 AWS의 완전관리형 사용자 인증 및 권한 부여 서비스입니다.
 
 웹/모바일 앱에 로그인 기능을 쉽게 추가하고, OAuth2/OIDC 표준을 통해 안전한 인증을 제공합니다.
 
+---
+
+## 2. 왜 Cognito가 필요한가?
+
+이 튜토리얼에서 Cognito는 두 가지 역할을 합니다:
+
+| 역할 | 설명 |
+|------|------|
+| **JWT 토큰 발급** | Gateway에 접근하기 위한 인증 토큰 |
+| **커스텀 클레임 추가** | Cedar 정책에서 사용할 department, groups 등 |
+
+```
+┌──────────────┐      JWT 토큰        ┌──────────────┐
+│   Cognito    │ ───────────────────> │   Gateway    │
+│              │  + department        │              │
+│              │  + groups            │              │
+└──────────────┘                      └──────────────┘
+                                             │
+                                             ▼
+                                      Cedar 정책에서 사용:
+                                      principal.getTag("department")
+```
+
+---
+
+## 3. 핵심 구성 요소
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                      Amazon Cognito                              │
+│                        User Pool                                 │
+│                      (사용자 저장소)                              │
 │                                                                  │
 │   ┌─────────────────────────────────────────────────────────┐   │
-│   │                    User Pool                             │   │
-│   │                  (사용자 저장소)                          │   │
-│   │                                                          │   │
-│   │   ┌─────────┐  ┌─────────┐  ┌─────────┐                 │   │
-│   │   │  User   │  │  User   │  │  User   │   ...           │   │
-│   │   │  Alice  │  │   Bob   │  │ Charlie │                 │   │
-│   │   └─────────┘  └─────────┘  └─────────┘                 │   │
-│   │                                                          │   │
-│   │   ┌─────────────────────────────────────────────────┐   │   │
-│   │   │              App Clients                         │   │   │
-│   │   │  ┌──────────┐  ┌──────────┐  ┌──────────┐       │   │   │
-│   │   │  │ Web App  │  │Mobile App│  │ M2M App  │       │   │   │
-│   │   │  │(사용자용)│  │(사용자용)│  │(서버용)  │       │   │   │
-│   │   │  └──────────┘  └──────────┘  └──────────┘       │   │   │
-│   │   └─────────────────────────────────────────────────┘   │   │
+│   │                    App Clients                           │   │
+│   │   ┌──────────┐  ┌──────────┐  ┌──────────┐              │   │
+│   │   │ Web App  │  │Mobile App│  │ M2M App  │ ← 이 튜토리얼  │   │
+│   │   │(사용자용)│  │(사용자용)│  │ (서버용) │              │   │
+│   │   └──────────┘  └──────────┘  └──────────┘              │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│                                                                  │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │  Resource Server: TestGateway                            │   │
+│   │  └── Scope: TestGateway/invoke                           │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│                                                                  │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │  Lambda Trigger (Pre Token Generation V3_0)              │   │
+│   │  └── 커스텀 클레임 추가: department_name, groups         │   │
 │   └─────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## 핵심 구성 요소
+### 3.1 User Pool (사용자 풀)
 
-### 1. User Pool (사용자 풀)
-
-**사용자 정보를 저장하는 디렉토리**입니다. 개별 사용자가 아닌, 사용자들의 **컨테이너**입니다.
+**사용자 정보를 저장하는 디렉토리**입니다.
 
 | 항목 | 설명 | 예시 |
 |------|------|------|
 | User Pool ID | 풀의 고유 식별자 | `us-east-1_ABC123` |
 | 사용자 속성 | 저장할 사용자 정보 | email, phone, custom:department |
 | 비밀번호 정책 | 최소 길이, 복잡도 등 | 8자 이상, 특수문자 포함 |
-| MFA 설정 | 다중 인증 요구 여부 | SMS, TOTP |
 
-### 2. App Client (앱 클라이언트)
+### 3.2 App Client (앱 클라이언트)
 
-**User Pool에 접근하는 애플리케이션**입니다. 각 앱마다 별도의 Client를 생성합니다.
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        User Pool                             │
-│                      (us-east-1_ABC)                         │
-│                                                              │
-│   ┌───────────────┐   ┌───────────────┐   ┌───────────────┐ │
-│   │  App Client 1 │   │  App Client 2 │   │  App Client 3 │ │
-│   │  (Web App)    │   │  (Mobile)     │   │  (M2M)        │ │
-│   │               │   │               │   │               │ │
-│   │ client_id:    │   │ client_id:    │   │ client_id:    │ │
-│   │ abc123...     │   │ def456...     │   │ ghi789...     │ │
-│   │               │   │               │   │               │ │
-│   │ OAuth 플로우: │   │ OAuth 플로우: │   │ OAuth 플로우: │ │
-│   │ Auth Code     │   │ Auth Code     │   │ Client Creds  │ │
-│   └───────────────┘   └───────────────┘   └───────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-```
+**User Pool에 접근하는 애플리케이션**입니다.
 
 | 설정 | 설명 |
 |------|------|
@@ -72,41 +79,9 @@
 | OAuth 플로우 | 인증 방식 (Authorization Code, Client Credentials 등) |
 | Scopes | 요청 가능한 권한 범위 |
 
-### 3. User Pool Domain (사용자 풀 도메인)
+### 3.3 Resource Server (리소스 서버)
 
-**OAuth2 엔드포인트를 제공**하는 URL입니다. 토큰 요청 시 이 도메인을 사용합니다.
-
-| 항목 | 설명 | 예시 |
-|------|------|------|
-| Domain Prefix | 도메인 접두사 (자동 생성) | `agentcore-****` |
-| Full Domain | 전체 도메인 URL | `agentcore-****.auth.us-east-1.amazoncognito.com` |
-| Token Endpoint | 토큰 발급 URL | `https://{domain}/oauth2/token` |
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  User Pool Domain                                                │
-│  https://agentcore-****.auth.us-east-1.amazoncognito.com        │
-│                                                                  │
-│   /oauth2/token      → 토큰 발급 (Client Credentials 플로우)     │
-│   /oauth2/authorize  → 로그인 페이지 (Authorization Code 플로우) │
-│   /oauth2/userInfo   → 사용자 정보 조회                          │
-│   /.well-known/...   → OIDC 설정 정보                            │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 4. Resource Server (리소스 서버)
-
-**커스텀 Scope를 정의**하는 곳입니다. API 리소스와 권한을 관리합니다.
-
-#### Scope 구조
-
-```
-{Resource Server Identifier}/{Scope Name}
-         │                       │
-         └── 리소스 식별자        └── 권한 이름
-```
-
-#### 이 튜토리얼의 Resource Server
+**커스텀 Scope를 정의**하는 곳입니다.
 
 ```
 Resource Server: TestGateway
@@ -117,67 +92,26 @@ Resource Server: TestGateway
 |------|-----|------|
 | Identifier | `TestGateway` | Resource Server 식별자 |
 | Scope Name | `invoke` | 권한 이름 |
-| Full Scope | `TestGateway/invoke` | 토큰 요청 시 사용하는 전체 scope |
+| Full Scope | `TestGateway/invoke` | 토큰 요청 시 사용 |
 
-#### 일반적인 Resource Server 예시
+### 3.4 User Pool Domain
 
-```
-Resource Server: insurance-api
-├── insurance-api/read        → 조회 권한
-├── insurance-api/write       → 수정 권한
-├── insurance-api/approve     → 승인 권한
-└── insurance-api/admin       → 관리자 권한
-```
-
-#### 토큰 요청 시 Scope 사용
-
-```bash
-curl -X POST https://agentcore-****.auth.us-east-1.amazoncognito.com/oauth2/token \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=client_credentials" \
-  -d "client_id=****" \
-  -d "client_secret=****" \
-  -d "scope=TestGateway/invoke"
-```
-
-## OAuth2 인증 플로우
-
-### 1. Authorization Code Flow (사용자 로그인용)
+**OAuth2 엔드포인트를 제공**하는 URL입니다.
 
 ```
-┌──────────┐         ┌─────────────┐         ┌─────────────┐
-│  사용자   │         │   Web App   │         │   Cognito   │
-│ (브라우저)│         │   (Client)  │         │ (User Pool) │
-└────┬─────┘         └──────┬──────┘         └──────┬──────┘
-     │                      │                       │
-     │  1. 로그인 클릭      │                       │
-     │─────────────────────>│                       │
-     │                      │                       │
-     │  2. Cognito 로그인 페이지로 리다이렉트        │
-     │<─────────────────────────────────────────────│
-     │                      │                       │
-     │  3. 이메일/비밀번호 입력                     │
-     │─────────────────────────────────────────────>│
-     │                      │                       │
-     │  4. Authorization Code 반환                  │
-     │<─────────────────────────────────────────────│
-     │                      │                       │
-     │                      │  5. Code → Token 교환 │
-     │                      │──────────────────────>│
-     │                      │                       │
-     │                      │  6. Access Token 반환 │
-     │                      │<──────────────────────│
-     │                      │                       │
-     │  7. 로그인 완료      │                       │
-     │<─────────────────────│                       │
+https://agentcore-****.auth.us-east-1.amazoncognito.com
+├── /oauth2/token      → 토큰 발급
+├── /oauth2/authorize  → 로그인 페이지
+└── /.well-known/...   → OIDC 설정 정보
 ```
 
-**특징**:
-- 사용자가 직접 로그인
-- ID Token + Access Token + Refresh Token 발급
-- 웹/모바일 앱에서 사용
+---
 
-### 2. Client Credentials Flow (M2M용)
+## 4. OAuth2 인증 플로우
+
+### 4.1 Client Credentials Flow (이 튜토리얼에서 사용)
+
+**M2M (Machine-to-Machine)** 통신용입니다. 사용자 로그인 없이 서버 간 직접 통신합니다.
 
 ```
 ┌─────────────────┐                      ┌─────────────────┐
@@ -185,32 +119,29 @@ curl -X POST https://agentcore-****.auth.us-east-1.amazoncognito.com/oauth2/toke
 │   (M2M Client)  │                      │   Token 엔드포인트 │
 └────────┬────────┘                      └────────┬────────┘
          │                                        │
-         │  1. POST /oauth2/token                 │
-         │     client_id + client_secret          │
-         │     grant_type=client_credentials      │
-         │     scope=openid                       │
+         │  POST /oauth2/token                    │
+         │  client_id + client_secret             │
+         │  grant_type=client_credentials         │
          │───────────────────────────────────────>│
          │                                        │
-         │  2. Access Token 반환                  │
-         │     (사용자 로그인 없이!)              │
+         │  Access Token 반환                     │
+         │  (사용자 로그인 없이!)                  │
          │<───────────────────────────────────────│
-         │                                        │
 ```
 
-**특징**:
+**특징:**
 - 사용자 로그인 **불필요** (서버 간 통신)
 - Access Token만 발급 (ID Token 없음)
 - AgentCore 튜토리얼에서 사용하는 방식
 
-**Python 코드 예시**:
+**Python 코드:**
+
 ```python
 import requests
 import base64
 
 def get_bearer_token(token_url, client_id, client_secret, scope="openid"):
     """M2M Client Credentials Flow로 토큰 발급"""
-
-    # Basic Auth 헤더 생성
     credentials = f"{client_id}:{client_secret}"
     encoded = base64.b64encode(credentials.encode()).decode()
 
@@ -225,23 +156,32 @@ def get_bearer_token(token_url, client_id, client_secret, scope="openid"):
             "scope": scope
         }
     )
-
     return response.json().get("access_token")
 ```
 
-## Lambda Triggers (Lambda 트리거)
+### 4.2 Authorization Code Flow (참고)
 
-**Cognito Lambda 트리거**는 Amazon Cognito가 특정 인증 이벤트 발생 시 Lambda 함수를 자동으로 호출하는 메커니즘입니다. 이를 통해 인증 플로우를 커스터마이징할 수 있습니다.
+**사용자 로그인용**입니다. 웹/모바일 앱에서 사용합니다.
 
-### 왜 Lambda 트리거가 필요한가?
+```
+사용자 ──> Web App ──> Cognito 로그인 페이지 ──> 사용자 인증 ──> Authorization Code ──> Access Token
+```
 
-기본적으로 Cognito가 발급하는 JWT 토큰에는 표준 클레임(`sub`, `iss`, `exp`, `client_id` 등)만 포함됩니다. 하지만 세밀한 접근 제어를 위해서는 **사용자 정의 클레임**(예: `department_name`, `groups`)이 필요합니다.
+---
+
+## 5. Lambda 트리거 (커스텀 클레임)
+
+### 5.1 왜 필요한가?
+
+기본 Cognito 토큰에는 표준 클레임만 포함됩니다:
 
 | 트리거 없음 | 트리거 설정 후 |
-|-------------|----------------|
-| `sub`, `iss`, `exp`, `client_id` (기본 클레임만) | `sub`, `iss`, `exp`, `client_id` + **`department_name`**, **`groups`** 등 |
+|------------|---------------|
+| `sub`, `client_id`, `exp`, `iss` | + **`department_name`**, **`groups`** 등 |
 
-### Pre Token Generation Trigger
+Cedar 정책에서 사용할 **커스텀 클레임**을 추가하려면 Lambda 트리거가 필요합니다.
+
+### 5.2 Pre Token Generation Trigger
 
 토큰 발급 **직전에** Lambda를 실행하여 **커스텀 클레임을 추가**합니다.
 
@@ -265,7 +205,7 @@ def get_bearer_token(token_url, client_id, client_secret, scope="openid"):
      │<─────────────────────│                       │
 ```
 
-### Lambda 버전별 차이
+### 5.3 Lambda 버전
 
 | 버전 | 지원 플로우 | M2M 지원 | Cognito 티어 |
 |------|------------|---------|--------------|
@@ -273,24 +213,9 @@ def get_bearer_token(token_url, client_id, client_secret, scope="openid"):
 | V2_0 | 사용자 로그인만 | ❌ | Lite (무료) |
 | **V3_0** | 사용자 로그인 + **Client Credentials** | ✅ | **Essentials/Plus** |
 
-**중요**: M2M (Client Credentials) 플로우에서 커스텀 클레임을 추가하려면 **V3_0 필수**!
+> **중요**: M2M (Client Credentials) 플로우에서 커스텀 클레임을 추가하려면 **V3_0 필수**!
 
-### Cognito User Pool에 트리거 설정
-
-```python
-# V3_0 트리거 설정 (M2M 플로우 지원)
-cognito_client.update_user_pool(
-    UserPoolId=user_pool_id,
-    LambdaConfig={
-        "PreTokenGenerationConfig": {
-            "LambdaVersion": "V3_0",  # M2M 플로우 지원을 위해 필수
-            "LambdaArn": lambda_arn,
-        }
-    },
-)
-```
-
-### Lambda 코드 예시 (V3_0)
+### 5.4 Lambda 코드 예시
 
 ```python
 def lambda_handler(event, context):
@@ -308,13 +233,7 @@ def lambda_handler(event, context):
                 'claimsToAddOrOverride': {
                     "department_name": "finance",
                     "employee_level": "senior",
-                    "groups": '["admins", "developers"]'  # 배열은 문자열로 직렬화됨
-                }
-            },
-            'idTokenGeneration': {
-                'claimsToAddOrOverride': {
-                    "department_name": "finance",
-                    "employee_level": "senior"
+                    "groups": '["admins", "developers"]'  # 배열은 문자열로 직렬화
                 }
             }
         }
@@ -323,9 +242,22 @@ def lambda_handler(event, context):
     return event
 ```
 
-### 커스텀 클레임과 Cedar 정책 연동
+### 5.5 트리거 설정
 
-Lambda 트리거로 추가된 클레임은 Cedar 정책에서 `principal.getTag()`로 접근합니다:
+```python
+# V3_0 트리거 설정 (M2M 플로우 지원)
+cognito_client.update_user_pool(
+    UserPoolId=user_pool_id,
+    LambdaConfig={
+        "PreTokenGenerationConfig": {
+            "LambdaVersion": "V3_0",  # M2M 플로우 지원을 위해 필수
+            "LambdaArn": lambda_arn,
+        }
+    },
+)
+```
+
+### 5.6 Cedar 정책에서 사용
 
 ```cedar
 // 부서 기반 접근 제어
@@ -343,21 +275,9 @@ when {
 };
 ```
 
-### Cognito Lambda 호출 권한 설정
+---
 
-Cognito가 Lambda 함수를 호출할 수 있도록 권한을 추가해야 합니다:
-
-```python
-lambda_client.add_permission(
-    FunctionName=lambda_arn,
-    StatementId=f"CognitoInvoke-{user_pool_id}",
-    Action="lambda:InvokeFunction",
-    Principal="cognito-idp.amazonaws.com",
-    SourceArn=f"arn:aws:cognito-idp:{region}:{account_id}:userpool/{user_pool_id}",
-)
-```
-
-## Cognito 티어
+## 6. Cognito 티어
 
 | 티어 | Lambda Trigger V3_0 | 가격 |
 |------|---------------------|------|
@@ -365,142 +285,13 @@ lambda_client.add_permission(
 | **Essentials** | ✅ | 유료 |
 | **Plus** | ✅ | 유료 (추가 기능) |
 
-**중요**: M2M + 커스텀 클레임을 사용하려면 **Essentials** 또는 **Plus** 티어 필요!
+> **중요**: M2M + 커스텀 클레임을 사용하려면 **Essentials** 또는 **Plus** 티어 필요!
 
-## AgentCore Gateway와 통합
+---
 
-### 전체 아키텍처
+## 7. 생성되는 리소스
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                                                                              │
-│  ┌──────────────┐                                                           │
-│  │   Cognito    │                                                           │
-│  │  User Pool   │                                                           │
-│  │              │                                                           │
-│  │ ┌──────────┐ │    ┌─────────────┐                                       │
-│  │ │M2M Client│─┼───>│ Lambda      │ Pre Token V3_0                        │
-│  │ └──────────┘ │    │ Trigger     │ (커스텀 클레임 추가)                   │
-│  └──────┬───────┘    └─────────────┘                                       │
-│         │                                                                    │
-│         │ Access Token                                                       │
-│         │ + 커스텀 클레임                                                    │
-│         ▼                                                                    │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                      AgentCore Gateway                               │   │
-│  │                                                                      │   │
-│  │  ┌─────────────────┐         ┌─────────────────────────────────┐   │   │
-│  │  │  JWT Authorizer │         │        Policy Engine            │   │   │
-│  │  │                 │         │        (Cedar 정책)              │   │   │
-│  │  │ 검증:           │         │                                 │   │   │
-│  │  │ - 서명          │   OK    │  principal.getTag("department") │   │   │
-│  │  │ - 만료          │────────>│  principal.getTag("groups")     │   │   │
-│  │  │ - client_id     │         │  context.input.amount           │   │   │
-│  │  │ - scope         │         │                                 │   │   │
-│  │  └─────────────────┘         └────────────────┬────────────────┘   │   │
-│  │                                               │                     │   │
-│  │                                        ┌──────┴──────┐              │   │
-│  │                                        │             │              │   │
-│  │                                     허용 ✓        거부 ✗            │   │
-│  │                                        │             │              │   │
-│  │                                        ▼             │              │   │
-│  │                                 ┌───────────┐        │              │   │
-│  │                                 │  Lambda   │        │              │   │
-│  │                                 │  Target   │        │              │   │
-│  │                                 └───────────┘        │              │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Gateway JWT Authorizer 설정
-
-```python
-{
-    "customJWTAuthorizer": {
-        "discoveryUrl": "https://cognito-idp.{region}.amazonaws.com/{user_pool_id}/.well-known/openid-configuration",
-        "allowedClients": ["{client_id}"],
-        "allowedAudience": [],        # Cognito는 aud 없음!
-        "allowedScopes": ["openid"]
-    }
-}
-```
-
-### 클레임 → Principal Tags 매핑
-
-JWT 토큰의 클레임이 Cedar에서 `principal.getTag()`로 접근됩니다.
-
-| JWT 클레임 | Cedar 접근 방식 |
-|-----------|-----------------|
-| `client_id` | `principal.id` |
-| `department_name` (커스텀) | `principal.getTag("department_name")` |
-| `groups` (커스텀) | `principal.getTag("groups")` |
-| `scope` | `principal.getTag("scope")` |
-
-## 일반적인 구성 패턴
-
-### 단일 User Pool, 다중 App Client
-
-```
-User Pool (us-east-1_ABC123)
-│
-├── App Client: Web Application
-│   └── Authorization Code Flow (사용자 로그인)
-│
-├── App Client: Mobile App
-│   └── Authorization Code Flow + PKCE
-│
-├── App Client: Agent Service (M2M)
-│   └── Client Credentials Flow
-│
-└── App Client: Admin Tool (M2M)
-    └── Client Credentials Flow + 추가 scope
-```
-
-### 환경별 분리
-
-```
-Production User Pool (us-east-1_PROD)
-└── Production App Clients
-
-Staging User Pool (us-east-1_STAGE)
-└── Staging App Clients
-
-Development User Pool (us-east-1_DEV)
-└── Development App Clients
-```
-
-## 요약
-
-| 구성 요소 | 역할 | 비유 |
-|----------|------|------|
-| User Pool | 사용자 저장소 | 회원 명부 |
-| App Client | 접근 애플리케이션 | 출입증 발급기 |
-| Resource Server | 권한 정의 | 권한 목록표 |
-| Lambda Trigger | 토큰 커스터마이징 | 출입증에 스티커 붙이기 |
-| JWT Token | 인증 증명서 | 출입증 |
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                                                              │
-│   Cognito User Pool  = 회원 관리 시스템                      │
-│                                                              │
-│   App Client         = 앱별 설정 (어떤 앱이 접근하는지)       │
-│                                                              │
-│   Lambda Trigger     = 토큰에 추가 정보 삽입                 │
-│                                                              │
-│   JWT Token          = 발급된 출입증 (클레임 포함)            │
-│                                                              │
-│   Gateway Authorizer = 출입증 검사                           │
-│                                                              │
-│   Cedar Policy       = 세부 출입 규칙 (어디까지 갈 수 있는지) │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## setup-gateway.py에서 생성되는 Cognito 리소스
-
-`create_oauth_authorizer_with_cognito("TestGateway")` 호출 시 다음 리소스가 생성됩니다:
+`setup-gateway.py` 실행 시 다음 리소스가 생성됩니다:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -523,21 +314,12 @@ Development User Pool (us-east-1_DEV)
 │     └── Client Secret: ****                                     │
 │     └── OAuth Flow: Client Credentials                          │
 │     └── Allowed Scope: TestGateway/invoke                       │
+│                                                                  │
+│  5. Lambda Trigger (V3_0)                                        │
+│     └── Pre Token Generation                                    │
+│     └── 커스텀 클레임: department_name, groups                   │
 └─────────────────────────────────────────────────────────────────┘
 ```
-
-### 생성된 리소스 요약
-
-| 리소스 | 이름/값 | 저장 위치 |
-|--------|---------|-----------|
-| User Pool Name | `agentcore-gateway-****` | (AWS 콘솔에서 확인) |
-| User Pool ID | `us-east-1_****` | `gateway_config.json` → `client_info.user_pool_id` |
-| Domain | `agentcore-****` | `gateway_config.json` → `client_info.domain_prefix` |
-| Token Endpoint | `https://{domain}.auth.{region}.amazoncognito.com/oauth2/token` | `gateway_config.json` → `client_info.token_endpoint` |
-| Resource Server | `TestGateway` | (AWS 콘솔에서 확인) |
-| Scope | `TestGateway/invoke` | `gateway_config.json` → `client_info.scope` |
-| Client ID | `****` | `gateway_config.json` → `client_info.client_id` |
-| Client Secret | `****` | `gateway_config.json` → `client_info.client_secret` |
 
 ### gateway_config.json 예시
 
@@ -554,7 +336,49 @@ Development User Pool (us-east-1_DEV)
 }
 ```
 
-## 참고 자료
+---
+
+## 8. 주의사항
+
+### 8.1 Cognito Access Token에는 `aud` 클레임이 없음
+
+```json
+// 일반적인 JWT (aud 있음)
+{ "aud": "my-client-id" }
+
+// Cognito Access Token (aud 없음!)
+{ "client_id": "my-client-id" }  // aud 대신 client_id 사용
+```
+
+→ Gateway JWT Authorizer에서 `allowedAudience`를 설정하면 **유효한 토큰도 거부**됩니다!
+
+### 8.2 Lambda 호출 권한
+
+Cognito가 Lambda를 호출하려면 권한이 필요합니다:
+
+```python
+lambda_client.add_permission(
+    FunctionName=lambda_arn,
+    StatementId=f"CognitoInvoke-{user_pool_id}",
+    Action="lambda:InvokeFunction",
+    Principal="cognito-idp.amazonaws.com",
+    SourceArn=f"arn:aws:cognito-idp:{region}:{account_id}:userpool/{user_pool_id}",
+)
+```
+
+### 8.3 배열 클레임은 문자열로 직렬화
+
+```python
+# Lambda에서
+"groups": '["admins", "developers"]'  # 문자열로 저장
+
+# Cedar에서
+principal.getTag("groups") like "*admins*"  # like로 검색
+```
+
+---
+
+## 9. 참고 자료
 
 - [Amazon Cognito 개발자 가이드](https://docs.aws.amazon.com/cognito/latest/developerguide/)
 - [OAuth2 Client Credentials Flow](https://oauth.net/2/grant-types/client-credentials/)

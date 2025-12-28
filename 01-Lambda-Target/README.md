@@ -1,10 +1,37 @@
 # Lambda 타겟을 사용한 AgentCore Policy
 
-## 개요
+## 왜 Lambda 타겟인가?
 
-이 튜토리얼은 **Amazon Bedrock AgentCore Policy**를 사용하여 AI 에이전트의 도구 호출에 대한 세분화된 접근 제어를 구현하는 방법을 설명합니다.
+Lambda 타겟은 AgentCore Policy를 시작하기에 **가장 간단한 방법**입니다:
 
-### 아키텍처
+| 장점 | 설명 |
+|------|------|
+| 빠른 설정 | MCP 서버 배포 없이 바로 시작 |
+| 숫자 비교 지원 | `amount <= 1000` 같은 정수 비교 가능 |
+| IAM 기반 인증 | 별도 Outbound Auth 설정 불필요 |
+
+> **권장**: 처음 시작하는 분은 이 튜토리얼부터 진행하세요.
+
+---
+
+## 학습 결과
+
+이 튜토리얼을 완료하면:
+
+```
+✓ 통과: Finance department should be allowed
+   예상: ALLOWED, 실제: ALLOWED
+
+✓ 통과: Engineering department should be denied
+   예상: DENIED, 실제: DENIED
+
+✓ 통과: Amount under $1000 should be allowed
+   예상: ALLOWED, 실제: ALLOWED
+```
+
+---
+
+## 아키텍처
 
 ```
                                 ┌───────────────────────┐
@@ -14,123 +41,97 @@
                                 │  평가 항목:            │
                                 │  - principal tags     │
                                 │  - context.input      │
-                                │  - resource           │
                                 └───────────┬───────────┘
                                             │ 연결됨
                                             ▼
 ┌─────────────────┐             ┌───────────────────────┐             ┌─────────────┐
 │   Amazon        │  JWT 토큰   │  AgentCore Gateway    │             │   Lambda    │
-│   Cognito       │────────────>│                       │────────────>│   Target    │
-│   + Lambda      │  + 클레임   │                       │  허용 시    │   (도구)    │
+│   Cognito       │────────────>│  + JWT Authorizer     │────────────>│   함수      │
+│   + Lambda      │  + 클레임   │  + Policy Engine      │  허용 시    │   (도구)    │
 └─────────────────┘             └───────────────────────┘             └─────────────┘
 ```
 
-### 튜토리얼 정보
+---
 
-| 항목 | 내용 |
-|------|------|
-| AgentCore 컴포넌트 | Gateway, Identity, Policy |
-| 난이도 | 중급 |
-| 사용 SDK | boto3, requests |
+## 테스트 시나리오
+
+| 시나리오 | Cedar 정책 | 테스트 |
+|----------|-----------|--------|
+| 부서 기반 | `principal.getTag("department_name") == "finance"` | finance ✅ / engineering ❌ |
+| 그룹 기반 | `principal.getTag("groups") like "*admins*"` | admins ✅ / developers ❌ |
+| 금액 제한 | `context.input.amount <= 1000` | $500 ✅ / $1500 ❌ |
+| 복합 조건 | 부서 + 금액 | finance+$500 ✅ / finance+$1500 ❌ |
+
+---
 
 ## 폴더 구조
 
 ```
 01-Lambda-Target/
 ├── README.md                      # 이 파일
-├── 01-Setup-Gateway-Lambda.ipynb  # Gateway 및 Lambda 설정
-├── 02-Policy-Enforcement.ipynb    # 정책 적용 테스트
-├── setup-gateway.py               # Gateway/Cognito 설정 스크립트
-├── gateway_config.json            # Gateway/Cognito 설정 (자동 생성)
+├── 01-Setup-Gateway-Lambda.ipynb  # Step 1: Gateway, Cognito, Lambda 설정
+├── 02-Policy-Enforcement.ipynb    # Step 2: Cedar 정책 테스트
+├── 03-Cleanup-Lambda-Target.ipynb # Step 3: 리소스 정리
+├── setup-gateway.py               # Gateway 설정 스크립트
+├── gateway_config.json            # 설정 저장 (자동 생성)
 └── img/                           # 스크린샷
 ```
 
-## 사전 요구사항
-
-- AWS 계정 및 적절한 IAM 권한
-- Amazon Bedrock AgentCore Gateway (OAuth Authorizer 설정됨)
-- Amazon Cognito User Pool (M2M 클라이언트, **Essentials** 또는 **Plus** 티어)
-- Python 3.10+
+---
 
 ## 시작하기
 
 ### 1. 환경 설정
 
-#### 옵션 A: UV 가상환경 사용 (권장)
-
 ```bash
-# 00_setup 폴더로 이동
 cd ../00_setup
-
-# 실행 권한 부여
 chmod +x create_uv_virtual_env.sh
-
-# 가상환경 생성 (커널 이름 필수)
 ./create_uv_virtual_env.sh AgentCorePolicy
 ```
 
-VS Code에서 노트북을 열고 `AgentCorePolicy` 커널을 선택하세요.
-
-#### 옵션 B: pip 직접 설치
-
-```bash
-pip install boto3 requests bedrock-agentcore-starter-toolkit jupyter
-```
-
-### 2. Gateway 설정
-
-Gateway와 Cognito가 아직 설정되지 않은 경우:
-
-```bash
-python setup-gateway.py --region us-east-1
-```
-
-### 3. 튜토리얼 실행
+### 2. 노트북 실행
 
 VS Code에서:
 1. `01-Setup-Gateway-Lambda.ipynb` 열기
-2. 우상단 'Select Kernel' → `AgentCorePolicy` 선택
+2. 우상단 **Select Kernel** → `AgentCorePolicy` 선택
 3. 셀 순서대로 실행
 4. 완료 후 `02-Policy-Enforcement.ipynb` 실행
 
-### 4. 문서 참고
+### 3. 리소스 정리
 
-상세한 개념 설명은 `../docs/` 폴더를 참고하세요:
+테스트 완료 후 `03-Cleanup-Lambda-Target.ipynb` 실행
 
-- [Amazon Cognito](../docs/cognito.md)
-- [Cedar Policy 문법](../docs/cedar-policy.md)
-- [JWT Authorizer](../docs/jwt-authorizer.md)
-- [문제 해결](../docs/troubleshooting.md)
+---
 
-## 학습 내용
+## Cedar 정책 핵심 패턴
 
-### 테스트 시나리오
+```cedar
+// 부서 기반 접근 제어
+permit(principal, action, resource)
+when {
+    principal.hasTag("department_name") &&
+    principal.getTag("department_name") == "finance"
+};
 
-| 시나리오 | 설명 |
-|----------|------|
-| 부서 기반 | finance 부서만 접근 허용 |
-| 그룹 기반 | admins 그룹만 접근 허용 (패턴 매칭) |
-| 복합 조건 | 부서 + 금액 제한 조합 |
+// 금액 제한 (Lambda 타겟에서만 작동)
+permit(principal, action, resource)
+when {
+    context.input.amount <= 1000
+};
+```
 
-### Cedar 정책 핵심 패턴
+---
 
-| 패턴 | Cedar 문법 |
-|------|------------|
-| 클레임 존재 확인 | `principal.hasTag("claim_name")` |
-| 정확한 일치 | `principal.getTag("claim_name") == "value"` |
-| 패턴 매칭 | `principal.getTag("claim_name") like "*value*"` |
-| 입력값 검증 | `context.input.field <= value` |
+## 사전 요구사항
 
-## 모범 사례
+- AWS 계정 및 적절한 IAM 권한
+- Python 3.10+
+- Amazon Cognito **Essentials** 또는 **Plus** 티어 (V3_0 Lambda 트리거 필요)
 
-1. **hasTag() 먼저 확인**: `getTag()` 전에 항상 `hasTag()`로 존재 확인
-2. **패턴 매칭 주의**: `like "*value*"`는 의도치 않은 매칭 가능
-3. **ALLOW/DENY 모두 테스트**: 양쪽 시나리오 검증
-4. **V3_0 Lambda 트리거**: M2M client credentials 플로우에 필수
+---
 
 ## 관련 자료
 
-- [MCP 서버 타겟 튜토리얼](../02-MCP-Server-Target/)
-- [Cedar 공식 사이트](https://www.cedarpolicy.com/)
-- [Amazon Verified Permissions](https://aws.amazon.com/verified-permissions/)
-- [Amazon Cognito 개발자 가이드](https://docs.aws.amazon.com/cognito/latest/developerguide/)
+- [MCP 서버 타겟 튜토리얼](../02-MCP-Server-Target/) - MCP 프로토콜 학습
+- [Cedar Policy 문법](../docs/cedar-policy.md)
+- [Amazon Cognito 가이드](../docs/cognito.md)
