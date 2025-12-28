@@ -189,8 +189,8 @@ chmod +x create_uv_virtual_env.sh
 3. **`AgentCorePolicy`** 선택
 
 ### 3. 튜토리얼 시작
-- **Lambda 타겟:** [01-Lambda-Target/01-Setup-Gateway-Lambda.ipynb](./01-Lambda-Target/01-Setup-Gateway-Lambda.ipynb)
-- **MCP 서버:** [02-MCP-Server-Target/01-Setup-MCP-Runtime-Gateway.ipynb](./02-MCP-Server-Target/01-Setup-MCP-Runtime-Gateway.ipynb)
+- **Lambda 타겟:** [01-Lambda-Target/README.md](./01-Lambda-Target/README.md)
+- **MCP 서버:** [02-MCP-Server-Target/README.md](./02-MCP-Server-Target/README.md)
 
 ---
 
