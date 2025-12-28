@@ -219,6 +219,7 @@ amazon-bedrock-agentcore-policy-tutorials/
 |------|------|
 | [Cedar Policy](./docs/cedar-policy.md) | Cedar 정책 언어 문법 및 예제 |
 | [Amazon Cognito](./docs/cognito.md) | Cognito User Pool, OAuth2, 커스텀 클레임 |
+| [JWT Authorizer](./docs/jwt-authorizer.md) | JWT 검증 및 Gateway 연동 |
 | [AgentCore Identity](./docs/agentcore-identity.md) | AI 에이전트 인증 (이 튜토리얼 범위 외) |
 
 ---
