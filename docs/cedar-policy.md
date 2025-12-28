@@ -28,6 +28,61 @@ permit(
 | `when` | 조건절 | 특정 조건에서만 적용 |
 | `unless` | 예외 조건 | 특정 조건 제외 |
 
+## Cedar 정책의 두 가지 평가 대상
+
+Cedar 정책은 **두 가지 유형의 데이터**를 평가할 수 있습니다:
+
+### 1. Principal 속성 (요청자 정보)
+
+JWT 토큰의 클레임에서 추출한 **요청자의 속성**입니다.
+
+```cedar
+// 누가 요청하는가?
+principal.getTag("department_name") == "finance"
+principal.getTag("groups") like "*admins*"
+```
+
+| 문법 | 설명 | 예시 |
+|------|------|------|
+| `principal.hasTag("claim")` | 클레임 존재 확인 | `hasTag("department_name")` |
+| `principal.getTag("claim")` | 클레임 값 조회 | `getTag("groups")` |
+
+### 2. Input 파라미터 (요청 내용)
+
+도구 호출 시 전달되는 **입력 인자**입니다.
+
+```cedar
+// 무엇을 요청하는가?
+context.input.amount <= 1000
+context.input.risk_level == "low"
+```
+
+| 문법 | 설명 | 예시 |
+|------|------|------|
+| `context.input.field` | 도구 인자 값 조회 | `context.input.amount` |
+| `context.input.field == value` | 정확한 값 비교 | `risk_level == "low"` |
+| `context.input.field <= value` | 숫자 비교 | `amount <= 1000` |
+| `context.input.field like pattern` | 패턴 매칭 | `risk_level like "*low*"` |
+
+### 복합 조건 (Principal + Input)
+
+두 가지를 결합하여 **누가 + 무엇을** 동시에 평가할 수 있습니다:
+
+```cedar
+permit(principal, action, resource)
+when {
+    // Principal: 요청자가 finance 부서인가?
+    principal.getTag("department_name") == "finance" &&
+    // Input: 요청 금액이 $1000 이하인가?
+    context.input.amount <= 1000
+};
+```
+
+**결과:** Finance 부서 직원이 $500 환불 요청 → ✅ 허용
+**결과:** Finance 부서 직원이 $1500 환불 요청 → ❌ 거부 (금액 초과)
+
+---
+
 ## AgentCore에서의 Cedar 사용
 
 ### 기본 패턴

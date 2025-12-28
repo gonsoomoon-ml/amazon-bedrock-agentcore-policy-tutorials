@@ -231,6 +231,16 @@ def get_bearer_token(token_url, client_id, client_secret, scope="openid"):
 
 ## Lambda Triggers (Lambda 트리거)
 
+**Cognito Lambda 트리거**는 Amazon Cognito가 특정 인증 이벤트 발생 시 Lambda 함수를 자동으로 호출하는 메커니즘입니다. 이를 통해 인증 플로우를 커스터마이징할 수 있습니다.
+
+### 왜 Lambda 트리거가 필요한가?
+
+기본적으로 Cognito가 발급하는 JWT 토큰에는 표준 클레임(`sub`, `iss`, `exp`, `client_id` 등)만 포함됩니다. 하지만 세밀한 접근 제어를 위해서는 **사용자 정의 클레임**(예: `department_name`, `groups`)이 필요합니다.
+
+| 트리거 없음 | 트리거 설정 후 |
+|-------------|----------------|
+| `sub`, `iss`, `exp`, `client_id` (기본 클레임만) | `sub`, `iss`, `exp`, `client_id` + **`department_name`**, **`groups`** 등 |
+
 ### Pre Token Generation Trigger
 
 토큰 발급 **직전에** Lambda를 실행하여 **커스텀 클레임을 추가**합니다.
@@ -257,36 +267,94 @@ def get_bearer_token(token_url, client_id, client_secret, scope="openid"):
 
 ### Lambda 버전별 차이
 
-| 버전 | 지원 플로우 | M2M 지원 |
-|------|------------|---------|
-| V1_0 | 사용자 로그인 | ❌ |
-| V2_0 | 사용자 로그인 | ❌ |
-| **V3_0** | 사용자 로그인 + **Client Credentials** | ✅ |
+| 버전 | 지원 플로우 | M2M 지원 | Cognito 티어 |
+|------|------------|---------|--------------|
+| V1_0 | 사용자 로그인만 | ❌ | Lite (무료) |
+| V2_0 | 사용자 로그인만 | ❌ | Lite (무료) |
+| **V3_0** | 사용자 로그인 + **Client Credentials** | ✅ | **Essentials/Plus** |
 
 **중요**: M2M (Client Credentials) 플로우에서 커스텀 클레임을 추가하려면 **V3_0 필수**!
+
+### Cognito User Pool에 트리거 설정
+
+```python
+# V3_0 트리거 설정 (M2M 플로우 지원)
+cognito_client.update_user_pool(
+    UserPoolId=user_pool_id,
+    LambdaConfig={
+        "PreTokenGenerationConfig": {
+            "LambdaVersion": "V3_0",  # M2M 플로우 지원을 위해 필수
+            "LambdaArn": lambda_arn,
+        }
+    },
+)
+```
 
 ### Lambda 코드 예시 (V3_0)
 
 ```python
 def lambda_handler(event, context):
-    """Pre Token Generation V3_0 Trigger"""
+    """
+    Cognito Pre-token generation V3 Lambda 트리거.
+    client_credentials 플로우를 포함한 모든 플로우에서 JWT에 커스텀 클레임을 추가합니다.
+    """
+    print(f"Event: {json.dumps(event)}")
+    print(f"Trigger Source: {event.get('triggerSource', 'unknown')}")
 
-    # 트리거 소스 확인
-    trigger_source = event.get('triggerSource', '')
-
-    # Client Credentials 플로우인 경우
-    if trigger_source == 'TokenGeneration_ClientCredentials':
-        # 커스텀 클레임 추가
-        event['response']['claimsAndScopeOverrideDetails'] = {
+    # 토큰에 커스텀 클레임 추가
+    event['response'] = {
+        'claimsAndScopeOverrideDetails': {
             'accessTokenGeneration': {
                 'claimsToAddOrOverride': {
-                    'department_name': 'finance',
-                    'groups': 'admins,users'
+                    "department_name": "finance",
+                    "employee_level": "senior",
+                    "groups": '["admins", "developers"]'  # 배열은 문자열로 직렬화됨
+                }
+            },
+            'idTokenGeneration': {
+                'claimsToAddOrOverride': {
+                    "department_name": "finance",
+                    "employee_level": "senior"
                 }
             }
         }
+    }
 
     return event
+```
+
+### 커스텀 클레임과 Cedar 정책 연동
+
+Lambda 트리거로 추가된 클레임은 Cedar 정책에서 `principal.getTag()`로 접근합니다:
+
+```cedar
+// 부서 기반 접근 제어
+permit(principal, action, resource)
+when {
+    principal.hasTag("department_name") &&
+    principal.getTag("department_name") == "finance"
+};
+
+// 그룹 기반 접근 제어 (배열은 문자열로 직렬화되므로 like 사용)
+permit(principal, action, resource)
+when {
+    principal.hasTag("groups") &&
+    principal.getTag("groups") like "*admins*"
+};
+```
+
+### Cognito Lambda 호출 권한 설정
+
+Cognito가 Lambda 함수를 호출할 수 있도록 권한을 추가해야 합니다:
+
+```python
+lambda_client.add_permission(
+    FunctionName=lambda_arn,
+    StatementId=f"CognitoInvoke-{user_pool_id}",
+    Action="lambda:InvokeFunction",
+    Principal="cognito-idp.amazonaws.com",
+    SourceArn=f"arn:aws:cognito-idp:{region}:{account_id}:userpool/{user_pool_id}",
+)
 ```
 
 ## Cognito 티어

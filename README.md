@@ -48,16 +48,17 @@ Amazon Bedrock AgentCore Policy를 사용하면 다음을 기반으로 AI 에이
    cd amazon-bedrock-agentcore-policy-tutorials
    ```
 
-2. **가상환경 생성**
+2. **가상환경 생성** (커널 이름 필수)
    ```bash
    cd 00_setup
    chmod +x create_uv_virtual_env.sh
    ./create_uv_virtual_env.sh AgentCorePolicy
    ```
 
-3. **Jupyter에서 커널 선택**
-   - Jupyter Lab/Notebook 열기
-   - `AgentCorePolicy` 커널 선택
+3. **VS Code에서 노트북 실행**
+   - `.ipynb` 파일 열기
+   - 우상단 'Select Kernel' 클릭
+   - `AgentCorePolicy` 선택
 
 4. **튜토리얼 선택**
    - Lambda 타겟: [01-Lambda-Target](./01-Lambda-Target/)으로 시작
@@ -93,7 +94,7 @@ amazon-bedrock-agentcore-policy-tutorials/
     ├── img/                     # 스크린샷
     ├── mcp_server.py            # MCP 서버 구현
     ├── Dockerfile               # 컨테이너 설정
-    ├── deploy_mcp_runtime.py    # 배포 스크립트
+    ├── setup_cognito_and_deploy_mcp_server_runtime.py  # Cognito 설정 및 배포
     ├── 01-Setup-MCP-Runtime-Gateway.ipynb
     └── 02-Policy-Enforcement.ipynb
 ```

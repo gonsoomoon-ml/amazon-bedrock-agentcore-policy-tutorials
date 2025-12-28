@@ -65,14 +65,11 @@ cd ../00_setup
 # 실행 권한 부여
 chmod +x create_uv_virtual_env.sh
 
-# 가상환경 생성 (커널 이름 지정)
+# 가상환경 생성 (커널 이름 필수)
 ./create_uv_virtual_env.sh AgentCorePolicy
-
-# Jupyter Lab 실행
-uv run jupyter lab
 ```
 
-Jupyter Lab에서 노트북을 열고 `AgentCorePolicy` 커널을 선택하세요.
+VS Code에서 노트북을 열고 `AgentCorePolicy` 커널을 선택하세요.
 
 #### 옵션 B: pip 직접 설치
 
@@ -90,14 +87,11 @@ python setup-gateway.py --region us-east-1
 
 ### 3. 튜토리얼 실행
 
-```bash
-# UV 환경에서 실행
-cd ../00_setup
-uv run jupyter lab
-
-# 1단계: 01-Setup-Gateway-Lambda.ipynb 노트북 실행
-# 2단계: 02-Policy-Enforcement.ipynb 노트북 실행
-```
+VS Code에서:
+1. `01-Setup-Gateway-Lambda.ipynb` 열기
+2. 우상단 'Select Kernel' → `AgentCorePolicy` 선택
+3. 셀 순서대로 실행
+4. 완료 후 `02-Policy-Enforcement.ipynb` 실행
 
 ### 4. 문서 참고
 

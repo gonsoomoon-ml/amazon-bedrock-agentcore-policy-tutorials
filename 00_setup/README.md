@@ -8,11 +8,13 @@
 # 1. 실행 권한 부여
 chmod +x create_uv_virtual_env.sh
 
-# 2. 가상환경 생성 (커널 이름 지정)
+# 2. 가상환경 생성 (커널 이름 필수)
 ./create_uv_virtual_env.sh AgentCorePolicy
 
-# 3. Jupyter Lab 실행
-uv run jupyter lab
+# 3. VS Code에서 노트북 실행
+#    - .ipynb 파일 열기
+#    - 우상단 'Select Kernel' 클릭
+#    - 'AgentCorePolicy' 선택
 ```
 
 ## 포함된 패키지
@@ -34,11 +36,12 @@ uv run jupyter lab
 source .venv/bin/activate
 ```
 
-### Jupyter 커널 선택
+### VS Code에서 커널 선택
 
-스크립트 실행 후 Jupyter Lab에서:
-1. 노트북 파일 열기
-2. 우상단 커널 선택에서 `AgentCorePolicy` 선택
+스크립트 실행 후 VS Code에서:
+1. `.ipynb` 파일 열기
+2. 우상단 'Select Kernel' 클릭
+3. `AgentCorePolicy` 선택
 
 ### 수동 설치 (UV 없이)
 
@@ -50,10 +53,8 @@ pip install boto3 requests bedrock-agentcore-starter-toolkit jupyter
 
 | 폴더 | 내용 |
 |------|------|
-| 01-Getting-Started | AgentCore Policy 시작하기 |
-| 02-Natural-Language-Policy-Authoring | 자연어로 Cedar 정책 생성 |
-| 03-Fine-Grained-Access-Control | 세분화된 접근 제어 (영문) |
-| 04-Fine-Grained-Access-Control-kr | 세분화된 접근 제어 (한글) |
+| 01-Lambda-Target | Lambda 백엔드를 사용한 정책 적용 |
+| 02-MCP-Server-Target | MCP 서버를 사용한 정책 적용 |
 
 ## 주요 명령어
 

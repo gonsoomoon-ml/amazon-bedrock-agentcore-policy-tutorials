@@ -37,7 +37,7 @@
 ├── 01-Setup-MCP-Runtime-Gateway.ipynb  # Gateway 및 MCP Runtime 설정
 ├── 02-Policy-Enforcement.ipynb    # 정책 적용 테스트
 ├── mcp_server.py                  # FastMCP 서버 (환불 도구 포함)
-├── deploy_mcp_runtime.py          # AgentCore Runtime 배포 스크립트
+├── setup_cognito_and_deploy_mcp_server_runtime.py  # Cognito 설정 및 Runtime 배포
 ├── Dockerfile                     # 컨테이너 설정
 ├── requirements_runtime.txt       # MCP 서버 의존성
 └── img/                           # 스크린샷
@@ -53,13 +53,13 @@ MCP 서버를 AWS AgentCore Runtime에 배포하면 퍼블릭 URL이 자동으�
 # 1단계: 환경 설정 (00_setup 폴더에서)
 cd ../00_setup
 ./create_uv_virtual_env.sh AgentCorePolicy
-
-# 2단계: Jupyter Lab 실행
-uv run jupyter lab
-
-# 3단계: 01-Setup-MCP-Runtime-Gateway.ipynb 노트북 실행
-# 4단계: 02-Policy-Enforcement.ipynb 노트북 실행
 ```
+
+VS Code에서:
+1. `01-Setup-MCP-Runtime-Gateway.ipynb` 열기
+2. 우상단 'Select Kernel' → `AgentCorePolicy` 선택
+3. 셀 순서대로 실행
+4. 완료 후 `02-Policy-Enforcement.ipynb` 실행
 
 ### 옵션 B: ngrok을 사용한 로컬 서버
 

@@ -9,6 +9,7 @@
 | 문서 | 내용 |
 |------|------|
 | [Amazon Cognito](cognito.md) | Cognito 개념 및 OAuth2 인증 플로우 |
+| [AgentCore Identity](agentcore-identity.md) | OAuth Credential Provider 및 백엔드 인증 |
 | [Cedar Policy 문법](cedar-policy.md) | Cedar 정책 언어 문법 및 예제 |
 | [JWT Authorizer](jwt-authorizer.md) | JWT Authorizer와 Scope 설명 |
 | [문제 해결](troubleshooting.md) | 자주 발생하는 오류 및 해결 방법 |
@@ -47,6 +48,10 @@ AWS가 개발한 오픈소스 인가(Authorization) 정책 언어입니다. "누
 ### JWT Authorizer
 
 Gateway에서 JWT 토큰을 검증하는 컴포넌트입니다. 토큰의 서명, 만료, 발급자 등을 확인합니다.
+
+### AgentCore Identity
+
+Gateway가 백엔드 타겟(MCP 서버 등)과 인증하기 위한 자격 증명을 관리하는 컴포넌트입니다. OAuth Credential Provider를 통해 자격 증명을 저장합니다.
 
 ### Principal Tags
 

@@ -9,19 +9,16 @@ This repository contains Jupyter notebook tutorials for implementing fine-graine
 ## Environment Setup
 
 ```bash
-# From 00_setup directory
+# From 00_setup directory (kernel name is required)
 cd 00_setup
 chmod +x create_uv_virtual_env.sh
 ./create_uv_virtual_env.sh AgentCorePolicy
-
-# Activate virtual environment
-source .venv/bin/activate
-
-# Run Jupyter
-uv run jupyter lab
 ```
 
-Select the `AgentCorePolicy` kernel when running notebooks.
+In VS Code:
+1. Open `.ipynb` file
+2. Click 'Select Kernel' (top right)
+3. Select `AgentCorePolicy`
 
 ## Architecture
 

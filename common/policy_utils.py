@@ -216,7 +216,12 @@ def wait_for_policy_active(
             return True
 
         if status in ["CREATE_FAILED", "UPDATE_FAILED"]:
-            print(f"  ✗ 정책 실패: {policy.get('statusReason', '알 수 없음')}")
+            reason = policy.get('statusReason') or policy.get('failureReason') or '알 수 없음'
+            print(f"  ✗ 정책 실패: {reason}")
+            # Print full response for debugging
+            import json
+            debug_info = {k: v for k, v in policy.items() if k not in ['document', 'createdAt', 'lastUpdatedAt']}
+            print(f"  디버그 정보: {json.dumps(debug_info, default=str)}")
             return False
 
         time.sleep(3)

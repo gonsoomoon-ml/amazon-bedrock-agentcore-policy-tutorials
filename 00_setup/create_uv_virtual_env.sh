@@ -3,7 +3,17 @@
 #####################################
 # Get kernel name from argument
 #####################################
-KERNEL_NAME="${1:-agentcore_policy}"
+if [ -z "$1" ]; then
+    echo "사용법: $0 <커널이름>"
+    echo ""
+    echo "예시:"
+    echo "  $0 AgentCorePolicy"
+    echo "  $0 my_kernel"
+    echo ""
+    exit 1
+fi
+
+KERNEL_NAME="$1"
 export VirtualEnv=".venv"
 
 echo "Setting up virtual environment: $VirtualEnv"
@@ -108,10 +118,10 @@ echo "=============================================="
 echo "Setup completed successfully!"
 echo "=============================================="
 echo ""
-echo "To activate: source .venv/bin/activate"
-echo "To run Jupyter: uv run jupyter lab"
+echo "VS Code에서 노트북 실행:"
+echo "  1. .ipynb 파일 열기"
+echo "  2. 우상단 'Select Kernel' 클릭"
+echo "  3. '$KERNEL_NAME' 선택"
 echo ""
-echo "In VS Code:"
-echo "  1. Open a notebook"
-echo "  2. Select kernel: $KERNEL_NAME"
+echo "(선택사항) 가상환경 활성화: source .venv/bin/activate"
 echo ""

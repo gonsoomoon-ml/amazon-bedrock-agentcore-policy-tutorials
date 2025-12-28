@@ -393,7 +393,7 @@ def list_gateway_targets(
             gatewayIdentifier=gateway_id
         )
 
-        targets = response.get("targets", [])
+        targets = response.get("items", [])
         print(f"  Found {len(targets)} target(s)")
 
         for target in targets:
