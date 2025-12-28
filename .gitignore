@@ -64,3 +64,4 @@ logs/
 *.tmp
 *.temp
 .cache/
+CLAUDE.md
