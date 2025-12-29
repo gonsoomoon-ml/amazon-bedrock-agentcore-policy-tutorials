@@ -83,6 +83,7 @@ MCP(Model Context Protocol)는 AI 에이전트가 도구를 호출하는 **업�
 ├── README.md                      # 이 파일
 ├── 01-Setup-MCP-Runtime-Gateway.ipynb  # Step 1: Runtime, Gateway 설정
 ├── 02-Policy-Enforcement.ipynb    # Step 2: Cedar 정책 테스트
+├── 03-Cleanup-MCP-Server-Target.ipynb  # Step 3: 리소스 정리
 ├── mcp_server.py                  # FastMCP 서버 코드
 ├── setup_cognito_and_deploy_mcp_server_runtime.py  # 설정 스크립트
 ├── Dockerfile                     # 컨테이너 설정
@@ -110,6 +111,13 @@ VS Code에서:
 2. 우상단 **Select Kernel** → `AgentCorePolicy` 선택
 3. 셀 순서대로 실행 (Runtime 배포에 5-10분 소요)
 4. 완료 후 `02-Policy-Enforcement.ipynb` 실행
+
+### 3. 리소스 정리
+
+튜토리얼 완료 후 AWS 리소스를 삭제하려면:
+1. `03-Cleanup-MCP-Server-Target.ipynb` 실행
+
+> **주의**: 이 노트북은 Gateway와 Gateway Cognito도 삭제합니다. Lambda 타겟 튜토리얼과 공유되는 리소스이므로, Lambda 타겟 튜토리얼도 재설정이 필요합니다.
 
 ---
 
