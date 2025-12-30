@@ -386,3 +386,4 @@ AgentCore Identity는 다른 AgentCore 컴포넌트와 통합됩니다:
   - [Outbound Auth 예제](https://github.com/awslabs/amazon-bedrock-agentcore-samples/tree/main/01-tutorials/03-AgentCore-identity/04-Outbound%20Auth%20example)
   - [3-Legged OAuth (Google)](https://github.com/awslabs/amazon-bedrock-agentcore-samples/tree/main/01-tutorials/03-AgentCore-identity/05-Outbound_Auth_3lo)
   - [GitHub Integration](https://github.com/awslabs/amazon-bedrock-agentcore-samples/tree/main/01-tutorials/03-AgentCore-identity/06-Outbound_Auth_Github)
+- [Outbound Auth 3LO - Google Calendar](./agentcore-identity-outbound-auth-3lo-google-calendar.md) (로컬)

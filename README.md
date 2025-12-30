@@ -230,6 +230,7 @@ amazon-bedrock-agentcore-policy-tutorials/
 | [Amazon Cognito](./docs/cognito.md) | Cognito User Pool, OAuth2, 커스텀 클레임 |
 | [JWT Authorizer](./docs/jwt-authorizer.md) | JWT 검증 및 Gateway 연동 |
 | [AgentCore Identity](./docs/agentcore-identity.md) | AI 에이전트 인증 (이 튜토리얼 범위 외) |
+| [Outbound Auth 3LO - Google Calendar](./docs/agentcore-identity-outbound-auth-3lo-google-calendar.md) | 3-Legged OAuth로 Google Calendar 접근 |
 
 ---
 
